@@ -121,6 +121,21 @@ const BANKS = ['官方样题', '扩充题A', '扩充题B'];
 let QUESTIONS = [], BYID = {}, PROGRESS = null;
 let PROGRESS_LIVE = false, PROGRESS_AT = 0;
 let PROGRESS_SRC = '';
+const FIGMAP = {};
+function ensureFig(f) {
+  if (FIGMAP[f]) return;
+  FIGMAP[f] = 'loading';
+  const key = f.replace(/\.[a-z]+$/i, '');
+  fetch(PAGE_DIR + 'figdata/' + key + '.json')
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => {
+      if (j && j.data) {
+        FIGMAP[f] = j.data;
+        document.querySelectorAll('img[data-fig="' + f + '"]').forEach(im => { im.src = j.data; });
+      } else { delete FIGMAP[f]; }
+    })
+    .catch(() => { delete FIGMAP[f]; });
+}
 
 async function resolveBase() {
   try {
@@ -204,7 +219,8 @@ function resLinks(q) {
 }
 function figsHtml(q) {
   if (q.figures && q.figures.length) {
-    return `<div class="qfigs">${q.figures.map(f => `<img src="${BASE}figs/${f}" alt="题图" loading="lazy">`).join('')}</div>`;
+    q.figures.forEach(f => ensureFig(f));
+    return `<div class="qfigs">${q.figures.map(f => `<img data-fig="${f}" src="${FIGMAP[f] && FIGMAP[f] !== 'loading' ? FIGMAP[f] : BASE + 'figs/' + f}" alt="题图" loading="lazy">`).join('')}</div>`;
   }
   if (q.hasFigure) return '<div class="fig" style="margin-bottom:10px">📷 本题带图，请对照学校样题原 PDF 查看题图</div>';
   return '';
@@ -255,10 +271,10 @@ async function refreshProgress() {
 function renderHome() {
   const sb = document.getElementById('sync-banner');
   if (sb) sb.innerHTML = PROGRESS_LIVE
-    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build d</div>'
+    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build e</div>'
     : (PROGRESS_SRC === 'mirror'
-      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build d</div>'
-      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build d</div>');
+      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build e</div>'
+      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build e</div>');
   const list = document.getElementById('bank-list');
   list.innerHTML = '';
   for (const bank of BANKS) {
