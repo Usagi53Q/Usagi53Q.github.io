@@ -57,7 +57,8 @@
     <h1>数字图像工程师刷题</h1>
     <div class="sub">ACAA 理论备考 · 三组题库完全分开 · 进度存在云端服务器，换设备打开同一链接接着练</div>
     <div class="sub" id="countdown" style="color:var(--warn);font-weight:600;font-size:14px"></div>
-    <div id="bank-list"></div>
+    <div id="sync-banner"></div>
+  <div id="bank-list"></div>
     <div class="card">
       <div class="bankname">错题本</div>
       <div class="stats" id="wrong-stat">加载中…</div>
@@ -118,6 +119,7 @@ let BASE = new URL(location.pathname.replace(/\/?$/, '/'), location.origin).href
 const PAGE_DIR = new URL('.', location.href).href;
 const BANKS = ['官方样题', '扩充题A', '扩充题B'];
 let QUESTIONS = [], BYID = {}, PROGRESS = null;
+let PROGRESS_LIVE = false, PROGRESS_AT = 0;
 
 async function resolveBase() {
   try {
@@ -218,12 +220,12 @@ function show(id) {
 }
 async function refreshProgress() {
   try {
-    PROGRESS = await api('progress');
+    PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_AT = Date.now();
     try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
   } catch (e1) {
     try {
       await resolveBase();
-      PROGRESS = await api('progress');
+      PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_AT = Date.now();
       try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
       renderHome();
       return;
@@ -237,6 +239,10 @@ async function refreshProgress() {
 }
 
 function renderHome() {
+  const sb = document.getElementById('sync-banner');
+  if (sb) sb.innerHTML = PROGRESS_LIVE
+    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build c</div>'
+    : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build c</div>';
   const list = document.getElementById('bank-list');
   list.innerHTML = '';
   for (const bank of BANKS) {
