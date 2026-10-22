@@ -120,6 +120,7 @@ const PAGE_DIR = new URL('.', location.href).href;
 const BANKS = ['官方样题', '扩充题A', '扩充题B'];
 let QUESTIONS = [], BYID = {}, PROGRESS = null;
 let PROGRESS_LIVE = false, PROGRESS_AT = 0;
+let PROGRESS_SRC = '';
 
 async function resolveBase() {
   try {
@@ -219,21 +220,34 @@ function show(id) {
   window.scrollTo(0, 0);
 }
 async function refreshProgress() {
+  // Same-origin static mirror first (exists on the Pages deployment): the
+  // server pushes progress-mirror.json whenever progress changes, so the
+  // displayed stats never depend on the tunnel being alive at this moment.
   try {
-    PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_AT = Date.now();
+    const mr = await fetch('progress-mirror.json?t=' + Date.now(), { cache: 'no-store' });
+    if (mr.ok) {
+      const mj = await mr.json();
+      if (mj && mj.banks) {
+        PROGRESS = mj; PROGRESS_SRC = 'mirror'; PROGRESS_AT = Date.now();
+        try { localStorage.setItem('progCache', JSON.stringify(mj)); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  try {
+    PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_SRC = 'live'; PROGRESS_AT = Date.now();
     try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
   } catch (e1) {
     try {
       await resolveBase();
-      PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_AT = Date.now();
+      PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_SRC = 'live'; PROGRESS_AT = Date.now();
       try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
       renderHome();
       return;
     } catch (e) {}
     if (!PROGRESS) {
-      try { PROGRESS = JSON.parse(localStorage.getItem('progCache') || 'null'); } catch (e2) {}
+      try { PROGRESS = JSON.parse(localStorage.getItem('progCache') || 'null'); if (PROGRESS) PROGRESS_SRC = 'cache'; } catch (e2) {}
     }
-    if (!PROGRESS) PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [] };
+    if (!PROGRESS) { PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [] }; PROGRESS_SRC = 'empty'; }
   }
   renderHome();
 }
@@ -241,8 +255,10 @@ async function refreshProgress() {
 function renderHome() {
   const sb = document.getElementById('sync-banner');
   if (sb) sb.innerHTML = PROGRESS_LIVE
-    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build c</div>'
-    : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build c</div>';
+    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build d</div>'
+    : (PROGRESS_SRC === 'mirror'
+      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build d</div>'
+      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build d</div>');
   const list = document.getElementById('bank-list');
   list.innerHTML = '';
   for (const bank of BANKS) {
