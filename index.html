@@ -65,6 +65,11 @@
       <div class="row" id="wrong-btns"></div>
     </div>
     <div class="card">
+      <div class="bankname">历史错题</div>
+      <div class="stats" id="history-stat">加载中…</div>
+      <div class="row" id="history-btns"></div>
+    </div>
+    <div class="card">
       <div class="bankname">收藏夹</div>
       <div class="stats" id="fav-stat">加载中…</div>
       <div class="row" id="fav-btns"></div>
@@ -115,7 +120,7 @@
 </div>
 
 <script>
-let BASE = 'https://acaa-quiz-api.usagi53q.workers.dev/5d3414c5f111cc536b7bf923/'; // build f: progress API on Cloudflare Workers (permanent address)
+let BASE = 'https://acaa-quiz-api.usagi53q.workers.dev/5d3414c5f111cc536b7bf923/'; // build g: progress API on Cloudflare Workers (permanent address)
 const PAGE_DIR = new URL('.', location.href).href;
 const BANKS = ['官方样题', '扩充题A', '扩充题B'];
 let QUESTIONS = [], BYID = {}, PROGRESS = null;
@@ -138,7 +143,7 @@ function ensureFig(f) {
 }
 
 async function resolveBase() {
-  // build f: the progress API lives at a permanent workers.dev address;
+  // build g: the progress API lives at a permanent workers.dev address;
   // there is no rotating tunnel locator to resolve anymore.
 }
 setInterval(() => { resolveBase().then(() => { flushOutbox(); refreshProgress(); }); }, 60000);
@@ -229,7 +234,7 @@ function show(id) {
   window.scrollTo(0, 0);
 }
 async function refreshProgress() {
-  // build f: live API is the single source of truth (no tunnel, no mirror).
+  // build g: live API is the single source of truth (no tunnel, no mirror).
   try {
     PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_SRC = 'live'; PROGRESS_AT = Date.now();
     try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
@@ -244,7 +249,7 @@ async function refreshProgress() {
     if (!PROGRESS) {
       try { PROGRESS = JSON.parse(localStorage.getItem('progCache') || 'null'); if (PROGRESS) PROGRESS_SRC = 'cache'; } catch (e2) {}
     }
-    if (!PROGRESS) { PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [] }; PROGRESS_SRC = 'empty'; }
+    if (!PROGRESS) { PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [], wrongHistory: [] }; PROGRESS_SRC = 'empty'; }
   }
   renderHome();
 }
@@ -252,10 +257,10 @@ async function refreshProgress() {
 function renderHome() {
   const sb = document.getElementById('sync-banner');
   if (sb) sb.innerHTML = PROGRESS_LIVE
-    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build f</div>'
+    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build g</div>'
     : (PROGRESS_SRC === 'mirror'
-      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build f</div>'
-      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build f</div>');
+      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build g</div>'
+      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build g</div>');
   const list = document.getElementById('bank-list');
   list.innerHTML = '';
   for (const bank of BANKS) {
@@ -291,6 +296,21 @@ function renderHome() {
     }
   }
   if (!wb.children.length) wb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无错题</span>';
+  const hist = PROGRESS.wrongHistory || [];
+  const fixedCount = hist.filter(h => !h.inBook).length;
+  document.getElementById('history-stat').innerHTML = `共 <b>${hist.length}</b> 道曾经答错的题（其中 <b>${fixedCount}</b> 道已订正）<br>答对移出错题本后，这里仍会保留，随时可再练`;
+  const hb = document.getElementById('history-btns');
+  hb.innerHTML = '';
+  for (const bank of BANKS) {
+    const ids = hist.filter(h => BYID[h.id] && BYID[h.id].bank === bank);
+    if (ids.length) {
+      const b = document.createElement('button');
+      b.textContent = `${bank}历史错题（${ids.length}）`;
+      b.onclick = () => startHistoryPractice(bank);
+      hb.appendChild(b);
+    }
+  }
+  if (!hb.children.length) hb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无历史错题</span>';
   const favs = PROGRESS.favorites || [];
   document.getElementById('fav-stat').innerHTML = `共 <b>${favs.length}</b> 道收藏题（练习时点「☆ 收藏」添加）`;
   const fb = document.getElementById('fav-btns');
@@ -372,6 +392,14 @@ async function toggleFav() {
   await api('favorite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qid: q.id, fav }) });
   if (fav) favs.push(q.id); else PROGRESS.favorites = favs.filter(id => id !== q.id);
   renderPracticeQ();
+}
+async function startHistoryPractice(bank) {
+  const hist = PROGRESS.wrongHistory || [];
+  const ids = hist.map(h => h.id).filter(id => BYID[id] && BYID[id].bank === bank);
+  if (!ids.length) return;
+  P = { title: '历史错题 · ' + bank, queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank };
+  document.getElementById('practice-title').textContent = P.title;
+  show('view-practice'); renderPracticeQ();
 }
 async function startWrongPractice(bank) {
   const wrong = await api('wrong');
