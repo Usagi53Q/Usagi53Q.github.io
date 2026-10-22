@@ -130,7 +130,7 @@ async function resolveBase() {
     }
   } catch (e) { /* keep current BASE */ }
 }
-setInterval(() => { resolveBase().then(flushOutbox); }, 60000);
+setInterval(() => { resolveBase().then(() => { flushOutbox(); refreshProgress(); }); }, 60000);
 function queueOutbox(path, opts) {
   try {
     const q = JSON.parse(localStorage.getItem('outbox') || '[]');
@@ -220,7 +220,14 @@ async function refreshProgress() {
   try {
     PROGRESS = await api('progress');
     try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
-  } catch (e) {
+  } catch (e1) {
+    try {
+      await resolveBase();
+      PROGRESS = await api('progress');
+      try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
+      renderHome();
+      return;
+    } catch (e) {}
     if (!PROGRESS) {
       try { PROGRESS = JSON.parse(localStorage.getItem('progCache') || 'null'); } catch (e2) {}
     }
