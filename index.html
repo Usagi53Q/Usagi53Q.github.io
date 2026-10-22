@@ -201,7 +201,7 @@ function resLinks(q) {
 }
 function figsHtml(q) {
   if (q.figures && q.figures.length) {
-    return `<div class="qfigs">${q.figures.map(f => `<img src="${PAGE_DIR}figs/${f}" alt="题图" loading="lazy">`).join('')}</div>`;
+    return `<div class="qfigs">${q.figures.map(f => `<img src="${BASE}figs/${f}" alt="题图" loading="lazy">`).join('')}</div>`;
   }
   if (q.hasFigure) return '<div class="fig" style="margin-bottom:10px">📷 本题带图，请对照学校样题原 PDF 查看题图</div>';
   return '';
