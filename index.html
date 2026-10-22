@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>數字圖像工程師刷題系統 · 固定入口</title>
 <style>
   body { margin:0; background:#171717; color:#f2f2f2; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; display:flex; min-height:100vh; align-items:center; justify-content:center; }
@@ -18,9 +21,22 @@
 <div class="box">
   <h1>數字圖像工程師刷題系統</h1>
   <p>刷題系統部署在雲端電腦上，地址會定期更換。本頁就是你的固定書籤，下面的按鈕永遠指向最新地址。進度保存在雲端電腦上，換裝置打開同一地址接著練。</p>
-  <div class="url">https://eqbpk-2a04-4e41-c-3cd4--96f9-3cd4.free.pinggy.net/5d3414c5f111cc536b7bf923/</div>
-  <a class="btn" href="https://eqbpk-2a04-4e41-c-3cd4--96f9-3cd4.free.pinggy.net/5d3414c5f111cc536b7bf923/">打開刷題系統</a>
+  <div class="url" id="url">https://eqbpk-2a04-4e41-c-3cd4--96f9-3cd4.free.pinggy.net/5d3414c5f111cc536b7bf923/</div>
+  <a class="btn" id="go" href="https://eqbpk-2a04-4e41-c-3cd4--96f9-3cd4.free.pinggy.net/5d3414c5f111cc536b7bf923/">打開刷題系統</a>
   <p class="small">這個入口地址永久不變，書籤存這一個就好。</p>
 </div>
+<script>
+// Always resolve the current quiz URL live, so a cached copy of this page
+// still leads to the live address. The baked-in URL above is only a fallback.
+fetch('quiz-url.json?t=' + Date.now())
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    if (d && d.url) {
+      document.getElementById('go').href = d.url;
+      document.getElementById('url').textContent = d.url;
+    }
+  })
+  .catch(function () {});
+</script>
 </body>
 </html>
