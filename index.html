@@ -1,42 +1,501 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>數字圖像工程師刷題系統 · 固定入口</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>数字图像工程师刷题系统</title>
 <style>
-  body { margin:0; background:#171717; color:#f2f2f2; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; display:flex; min-height:100vh; align-items:center; justify-content:center; }
-  .box { max-width:560px; padding:24px 20px; text-align:center; }
-  h1 { font-size:20px; margin:0 0 12px; }
-  p { color:#a8a8a8; font-size:14px; line-height:1.7; }
-  .url { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; word-break:break-all; background:#232323; border:1px solid #3a3a3a; border-radius:10px; padding:12px; margin:16px 0; color:#f2f2f2; }
-  a.btn { display:block; background:#f5a524; color:#171717; font-weight:700; font-size:17px; text-decoration:none; border-radius:12px; padding:15px; margin:18px 0 10px; }
-  .small { font-size:12px; color:#777; }
+  :root { --bg:#171717; --card:#232323; --line:#3a3a3a; --txt:#f2f2f2; --dim:#a8a8a8; --blue:#005aff; --ok:#2fbf71; --bad:#e5484d; --warn:#f5a524; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--txt); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:16px 14px 48px; }
+  h1 { font-size:20px; margin:8px 0 2px; }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .bankname { font-size:16px; font-weight:600; }
+  .main-badge { background:var(--blue); color:#fff; font-size:11px; border-radius:6px; padding:2px 6px; margin-left:6px; vertical-align:2px; }
+  .stats { color:var(--dim); font-size:13px; margin:6px 0 10px; line-height:1.7; }
+  .stats b { color:var(--txt); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  button { appearance:none; border:1px solid var(--line); background:#2c2c2c; color:var(--txt); border-radius:10px; padding:10px 14px; font-size:14px; cursor:pointer; }
+  button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button:disabled { opacity:.45; }
+  button.sel { border-color:var(--blue); background:rgba(0,90,255,.18); }
+  .topbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .topbar .back { padding:8px 12px; }
+  .topbar .title { font-weight:600; font-size:15px; }
+  .timer { margin-left:auto; font-variant-numeric:tabular-nums; color:var(--warn); font-weight:600; }
+  .qmeta { color:var(--dim); font-size:12px; margin-bottom:6px; }
+  .qstem { font-size:16px; line-height:1.65; margin-bottom:12px; white-space:pre-wrap; }
+  .opt { display:block; width:100%; text-align:left; margin-bottom:8px; padding:12px; line-height:1.5; }
+  .opt.correct { border-color:var(--ok); background:rgba(47,191,113,.15); }
+  .opt.wrongpick { border-color:var(--bad); background:rgba(229,72,77,.15); }
+  .feedback { border-radius:10px; padding:10px 12px; font-size:14px; margin:10px 0; line-height:1.6; }
+  .feedback.ok { background:rgba(47,191,113,.15); }
+  .feedback.bad { background:rgba(229,72,77,.15); }
+  .note { color:var(--warn); font-size:12px; margin-top:6px; line-height:1.6; }
+  .explain { color:var(--dim); font-size:13px; margin-top:6px; line-height:1.7; }
+.reslinks { margin-top:8px; font-size:13px; color:var(--dim); line-height:2; }
+.reslinks a { color:var(--accent); margin-right:14px; text-decoration:none; white-space:nowrap; }
+  .fig { color:var(--warn); font-size:12px; }
+  .qfigs { margin:4px 0 12px; }
+  .qfigs img { max-width:100%; height:auto; border-radius:8px; border:1px solid var(--line); display:block; margin-bottom:8px; background:#fff; }
+  select { background:#2c2c2c; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px; font-size:14px; max-width:100%; }
+  .review-item { border-top:1px solid var(--line); padding:10px 0; font-size:14px; line-height:1.6; }
+  .review-item:first-child { border-top:none; }
+  .big-score { font-size:30px; font-weight:700; }
+  .pass { color:var(--ok); } .fail { color:var(--bad); }
+  .hidden { display:none; }
+  .prog { height:6px; background:#333; border-radius:3px; overflow:hidden; margin-top:4px; }
+  .prog > div { height:100%; background:var(--blue); }
 </style>
 </head>
 <body>
-<div class="box">
-  <h1>數字圖像工程師刷題系統</h1>
-  <p>刷題系統部署在雲端電腦上，地址會定期更換。本頁就是你的固定書籤，下面的按鈕永遠指向最新地址。進度保存在雲端電腦上，換裝置打開同一地址接著練。</p>
-  <div class="url" id="url">https://dbtzg-104-29-193-195.free.pinggy.net/5d3414c5f111cc536b7bf923/</div>
-  <a class="btn" id="go" href="https://dbtzg-104-29-193-195.free.pinggy.net/5d3414c5f111cc536b7bf923/">打開刷題系統</a>
-  <p class="small">這個入口地址永久不變，書籤存這一個就好。</p>
+<div class="wrap">
+  <!-- HOME -->
+  <div id="view-home">
+    <h1>数字图像工程师刷题</h1>
+    <div class="sub">ACAA 理论备考 · 三组题库完全分开 · 进度存在云端服务器，换设备打开同一链接接着练</div>
+    <div class="sub" id="countdown" style="color:var(--warn);font-weight:600;font-size:14px"></div>
+    <div id="bank-list"></div>
+    <div class="card">
+      <div class="bankname">错题本</div>
+      <div class="stats" id="wrong-stat">加载中…</div>
+      <div class="row" id="wrong-btns"></div>
+    </div>
+    <div class="card">
+      <div class="bankname">收藏夹</div>
+      <div class="stats" id="fav-stat">加载中…</div>
+      <div class="row" id="fav-btns"></div>
+    </div>
+    <div class="card">
+      <div class="bankname">模拟成绩</div>
+      <div class="stats" id="exam-history">加载中…</div>
+    </div>
+  </div>
+
+  <!-- PRACTICE -->
+  <div id="view-practice" class="hidden">
+    <div class="topbar">
+      <button class="back" onclick="goHome()">← 返回</button>
+      <div class="title" id="practice-title">学习模式</div>
+      <div class="timer" id="practice-pos"></div>
+    </div>
+    <div class="card" id="practice-card"></div>
+    <div class="row">
+      <button id="btn-prev" onclick="practiceMove(-1)">上一题</button>
+      <button id="btn-check" class="primary" onclick="practiceCheck()">提交答案</button>
+      <button id="btn-next" onclick="practiceMove(1)">下一题</button>
+      <button id="btn-memo" onclick="toggleMemo()">背题：关</button>
+      <button id="btn-fav" onclick="toggleFav()">☆ 收藏</button>
+    </div>
+  </div>
+
+  <!-- EXAM -->
+  <div id="view-exam" class="hidden">
+    <div class="topbar">
+      <button class="back" onclick="if(confirm('放弃这场考试？进度不会保存。')) goHome()">← 放弃</button>
+      <div class="title" id="exam-title">模拟考试</div>
+      <div class="timer" id="exam-timer">90:00</div>
+    </div>
+    <div id="exam-list"></div>
+    <button class="primary" style="width:100%;padding:14px" onclick="submitExam()">交卷</button>
+  </div>
+
+  <!-- EXAM RESULT -->
+  <div id="view-result" class="hidden">
+    <div class="topbar">
+      <button class="back" onclick="goHome()">← 返回首页</button>
+      <div class="title">考试结果</div>
+    </div>
+    <div class="card" id="result-summary"></div>
+    <div class="card" id="result-review"></div>
+  </div>
 </div>
+
 <script>
-// Always resolve the current quiz URL live, so a cached copy of this page
-// still leads to the live address. The baked-in URL above is only a fallback.
-fetch('quiz-url.json?t=' + Date.now())
-  .then(function (r) { return r.json(); })
-  .then(function (d) {
-    if (d && d.url) {
-      document.getElementById('go').href = d.url;
-      document.getElementById('url').textContent = d.url;
+let BASE = new URL(location.pathname.replace(/\/?$/, '/'), location.origin).href;
+const PAGE_DIR = new URL('.', location.href).href;
+const BANKS = ['官方样题', '扩充题A', '扩充题B'];
+let QUESTIONS = [], BYID = {}, PROGRESS = null;
+
+async function resolveBase() {
+  try {
+    const r = await fetch('https://usagi53q.github.io/quiz-url.json?ts=' + Date.now(), { cache: 'no-store' });
+    const j = await r.json();
+    if (j && j.url && j.url !== BASE) {
+      const old = BASE;
+      BASE = j.url;
+      document.querySelectorAll('img').forEach(im => { if (im.src.startsWith(old)) im.src = BASE + im.src.slice(old.length); });
     }
-  })
-  .catch(function () {});
+  } catch (e) { /* keep current BASE */ }
+}
+setInterval(() => { resolveBase().then(flushOutbox); }, 60000);
+function queueOutbox(path, opts) {
+  try {
+    const q = JSON.parse(localStorage.getItem('outbox') || '[]');
+    q.push({ path, body: opts.body });
+    localStorage.setItem('outbox', JSON.stringify(q));
+  } catch (e) {}
+}
+async function flushOutbox() {
+  let q;
+  try { q = JSON.parse(localStorage.getItem('outbox') || '[]'); } catch (e) { q = []; }
+  if (!q.length) return;
+  const left = [];
+  for (const item of q) {
+    try {
+      const r = await fetch(BASE + 'api/' + item.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: item.body });
+      if (!r.ok) throw new Error('flush ' + r.status);
+      await r.json();
+    } catch (e) { left.push(item); }
+  }
+  try { localStorage.setItem('outbox', JSON.stringify(left)); } catch (e) {}
+  if (left.length < q.length) refreshProgress();
+}
+async function api(path, opts) {
+  try {
+    const r = await fetch(BASE + 'api/' + path, opts);
+    return await r.json();
+  } catch (e) {
+    await resolveBase();
+    try {
+      const r = await fetch(BASE + 'api/' + path, opts);
+      return await r.json();
+    } catch (e2) {
+      if (opts && opts.method === 'POST') { queueOutbox(path, opts); return { ok: true, queued: true }; }
+      throw e2;
+    }
+  }
+}
+async function loadQuestions() {
+  try {
+    const r = await fetch(PAGE_DIR + 'questions.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('static questions ' + r.status);
+    return await r.json();
+  } catch (e) {
+    return await api('questions');
+  }
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const RESOURCES = {
+  '自动化与文件': { doc: ['Adobe 官方文档：创建动作', 'https://helpx.adobe.com/cn/photoshop/using/creating-actions.html'], kw: 'Photoshop 动作 批处理 教程' },
+  '调色与色彩': { doc: ['Adobe 官方文档：曲线调整', 'https://helpx.adobe.com/cn/photoshop/using/curves-adjustment.html'], kw: 'Photoshop 色阶 曲线 调色 教程' },
+  '图层与蒙版': { doc: ['Adobe 官方文档：图层基础', 'https://helpx.adobe.com/cn/photoshop/using/layers.html'], kw: 'Photoshop 图层 蒙版 教程' },
+  '绘制与画笔': { doc: ['Adobe 官方文档：创建和修改画笔', 'https://helpx.adobe.com/cn/photoshop/using/creating-modifying-brushes.html'], kw: 'Photoshop 画笔 设置 教程' },
+  '选区': { doc: ['Adobe 官方文档：建立选区', 'https://helpx.adobe.com/cn/photoshop/using/making-selections.html'], kw: 'Photoshop 选区 抠图 教程' },
+  '通道': { doc: ['Adobe 官方文档：通道基础', 'https://helpx.adobe.com/cn/photoshop/using/channel-basics.html'], kw: 'Photoshop 通道 教程' },
+  '路径与矢量': { doc: ['Adobe 官方文档：路径', 'https://helpx.adobe.com/cn/photoshop/using/paths.html'], kw: 'Photoshop 钢笔 路径 教程' },
+  '滤镜': { doc: ['Adobe 官方文档：滤镜基础', 'https://helpx.adobe.com/cn/photoshop/using/filter-basics.html'], kw: 'Photoshop 滤镜 教程' },
+  '变换与修复': { doc: ['Adobe 官方文档：应用变换', 'https://helpx.adobe.com/cn/photoshop/desktop/crop-resize-transform/transform-manipulate-reshape/apply-transformations.html'], kw: 'Photoshop 自由变换 修复 教程' },
+  '文字': { doc: ['Adobe 官方文档：添加和编辑文字', 'https://helpx.adobe.com/cn/photoshop/using/add-edit-text.html'], kw: 'Photoshop 文字 排版 教程' },
+  '3D': { doc: null, kw: 'Photoshop 3D 功能 教程' },
+  '_通用': { doc: ['Adobe 官方文档：Photoshop 入门', 'https://helpx.adobe.com/cn/photoshop/get-started.html'], kw: 'Photoshop 基础教程 入门' }
+};
+function resLinks(q) {
+  const mod = (q.modules || []).find(m => RESOURCES[m]);
+  const r = mod ? RESOURCES[mod] : RESOURCES['_通用'];
+  const kw = encodeURIComponent(r.kw);
+  const doc = r.doc ? '<a href="' + r.doc[1] + '" target="_blank" rel="noopener">\u{1F4D6} ' + r.doc[0] + '</a>' : '';
+  return '<div class="reslinks">相关学习：' + doc + '<a href="https://www.youtube.com/results?search_query=' + kw + '" target="_blank" rel="noopener">\u25B6 YouTube</a><a href="https://search.bilibili.com/all?keyword=' + kw + '" target="_blank" rel="noopener">\u25B6 Bilibili</a><span style="white-space:nowrap">（搜「' + r.kw + '」）</span></div>';
+}
+function figsHtml(q) {
+  if (q.figures && q.figures.length) {
+    return `<div class="qfigs">${q.figures.map(f => `<img src="${PAGE_DIR}figs/${f}" alt="题图" loading="lazy">`).join('')}</div>`;
+  }
+  if (q.hasFigure) return '<div class="fig" style="margin-bottom:10px">📷 本题带图，请对照学校样题原 PDF 查看题图</div>';
+  return '';
+}
+function sameSet(a, b) {
+  if (a.length !== b.length) return false;
+  const s = new Set(b); return a.every(x => s.has(x));
+}
+function show(id) {
+  for (const v of ['view-home','view-practice','view-exam','view-result']) {
+    document.getElementById(v).classList.toggle('hidden', v !== id);
+  }
+  window.scrollTo(0, 0);
+}
+async function refreshProgress() {
+  try {
+    PROGRESS = await api('progress');
+    try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
+  } catch (e) {
+    if (!PROGRESS) {
+      try { PROGRESS = JSON.parse(localStorage.getItem('progCache') || 'null'); } catch (e2) {}
+    }
+    if (!PROGRESS) PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [] };
+  }
+  renderHome();
+}
+
+function renderHome() {
+  const list = document.getElementById('bank-list');
+  list.innerHTML = '';
+  for (const bank of BANKS) {
+    const s = PROGRESS.banks[bank] || { total: 0, practiced: 0, correct: 0, answered: 0, wrongCount: 0, lastExam: null };
+    const acc = s.answered ? Math.round(100 * s.correct / s.answered) : null;
+    const examTxt = s.lastExam ? `最近模拟 <b>${s.lastExam.score}/40</b>（答对 ${s.lastExam.correct}/${s.lastExam.total}）` : '还没做过模拟';
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="bankname">${esc(bank)}${bank === '官方样题' ? '<span class="main-badge">主练 · 学校给的</span>' : ''}</div>
+      ${bank === '扩充题B' ? '<div class="note">⚠️ 本组参考答案为 AI 核对版，非官方答案，仅作扩量练习。</div>' : ''}
+      <div class="stats">已练 <b>${s.practiced}/${s.total}</b> 题 · 正确率 <b>${acc === null ? '—' : acc + '%'}</b> · 错题 <b>${s.wrongCount}</b> 题<br>${examTxt}
+      <div class="prog"><div style="width:${s.total ? Math.round(100 * s.practiced / s.total) : 0}%"></div></div></div>
+      <div class="row">
+        <button class="primary" onclick="startPractice('${bank}')">学习模式</button>
+        <button onclick="startPractice('${bank}', null, true)">随机练习</button>
+        <button onclick="startExam('${bank}')">模拟考试（50题/90分钟）</button>
+        <button onclick="toggleMods('${bank}')">按模块练 ▾</button>
+      </div>
+      <div id="mods-${bank}" class="hidden"></div>`;
+    list.appendChild(card);
+  }
+  const wb = document.getElementById('wrong-btns');
+  wb.innerHTML = '';
+  document.getElementById('wrong-stat').innerHTML = `共 <b>${PROGRESS.wrongTotal}</b> 道错题（按组分开重练，答对自动移出）`;
+  for (const bank of BANKS) {
+    const s = PROGRESS.banks[bank];
+    if (s && s.wrongCount > 0) {
+      const b = document.createElement('button');
+      b.textContent = `${bank}错题（${s.wrongCount}）`;
+      b.onclick = () => startWrongPractice(bank);
+      wb.appendChild(b);
+    }
+  }
+  if (!wb.children.length) wb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无错题</span>';
+  const favs = PROGRESS.favorites || [];
+  document.getElementById('fav-stat').innerHTML = `共 <b>${favs.length}</b> 道收藏题（练习时点「☆ 收藏」添加）`;
+  const fb = document.getElementById('fav-btns');
+  fb.innerHTML = '';
+  for (const bank of BANKS) {
+    const ids = favs.filter(id => BYID[id] && BYID[id].bank === bank);
+    if (ids.length) {
+      const b = document.createElement('button');
+      b.textContent = `${bank}收藏（${ids.length}）`;
+      b.onclick = () => startFavPractice(bank);
+      fb.appendChild(b);
+    }
+  }
+  if (!fb.children.length) fb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无收藏</span>';
+  const eh = document.getElementById('exam-history');
+  const exams = (PROGRESS.exams || []).slice().reverse();
+  if (!exams.length) eh.innerHTML = '还没做过模拟考试';
+  else eh.innerHTML = exams.slice(0, 8).map(ex => {
+    const d = new Date(ex.at);
+    const ds = `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const gate = ex.correct >= Math.ceil(ex.total * 0.6);
+    return `${ds} · ${esc(ex.bank)} · <b>${ex.score}/40</b> · 答对 ${ex.correct}/${ex.total} · <span class="${gate ? 'pass' : 'fail'}">${gate ? '✅ 过门槛' : '❌ 未过门槛'}</span>`;
+  }).join('<br>');
+  renderCountdown();
+}
+function renderCountdown() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const exam = new Date(2026, 10, 3);
+  const d = Math.round((exam - today) / 86400000);
+  const el = document.getElementById('countdown');
+  if (el) el.textContent = d > 0 ? `⏳ 距考试（11月3日）还有 ${d} 天` : (d === 0 ? '⏳ 今天就是考试日，加油！' : '');
+}
+function toggleMods(bank) {
+  const box = document.getElementById('mods-' + bank);
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  const mods = (PROGRESS.banks[bank] && PROGRESS.banks[bank].modules) || {};
+  box.innerHTML = Object.entries(mods).map(([m, s]) => {
+    const acc = s.answered ? Math.round(100 * s.correct / s.answered) : null;
+    return `<div class="review-item" style="display:flex;align-items:center;gap:8px">
+      <span style="flex:1">${esc(m)} · 已练 ${s.practiced}/${s.total}${acc === null ? '' : ` · 正确率 ${acc}%`}</span>
+      <button onclick="startPractice('${bank}', '${m}')">练这个模块</button>
+    </div>`;
+  }).join('') || '<div class="stats">暂无模块数据</div>';
+  box.classList.remove('hidden');
+}
+function goHome() { stopTimer(); show('view-home'); refreshProgress(); }
+
+/* ---------- practice ---------- */
+let P = null; // {title, queue:[qid], idx, picked:Set, checked:bool}
+function startPractice(bank, module, shuffle) {
+  let qs = QUESTIONS.filter(q => q.bank === bank && (!module || q.modules.includes(module)));
+  let idx = 0;
+  if (shuffle) {
+    qs = qs.slice();
+    for (let i = qs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [qs[i], qs[j]] = [qs[j], qs[i]]; }
+  } else {
+    const done = new Set((PROGRESS && PROGRESS.practicedIds) || []);
+    idx = qs.findIndex(q => !done.has(q.id));
+    if (idx === -1) idx = 0;
+  }
+  P = { title: (shuffle ? '随机练习 · ' : '学习模式 · ') + bank + (module ? ' · ' + module : ''), queue: qs.map(q => q.id), idx, picked: new Set(), checked: false, mode: 'practice', bank, memo: false };
+  document.getElementById('practice-title').textContent = P.title;
+  show('view-practice'); renderPracticeQ();
+}
+function startFavPractice(bank) {
+  const ids = (PROGRESS.favorites || []).filter(id => BYID[id] && BYID[id].bank === bank);
+  if (!ids.length) return;
+  P = { title: '收藏练习 · ' + bank, queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank, memo: false };
+  document.getElementById('practice-title').textContent = P.title;
+  show('view-practice'); renderPracticeQ();
+}
+function toggleMemo() { if (!P) return; P.memo = !P.memo; renderPracticeQ(); }
+async function toggleFav() {
+  if (!P) return;
+  const q = BYID[P.queue[P.idx]];
+  const favs = PROGRESS.favorites || (PROGRESS.favorites = []);
+  const fav = !favs.includes(q.id);
+  await api('favorite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qid: q.id, fav }) });
+  if (fav) favs.push(q.id); else PROGRESS.favorites = favs.filter(id => id !== q.id);
+  renderPracticeQ();
+}
+async function startWrongPractice(bank) {
+  const wrong = await api('wrong');
+  const ids = wrong.filter(id => BYID[id] && BYID[id].bank === bank);
+  if (!ids.length) return;
+  P = { title: '错题重练 · ' + bank, queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank };
+  document.getElementById('practice-title').textContent = P.title;
+  show('view-practice'); renderPracticeQ();
+}
+function renderPracticeQ() {
+  const q = BYID[P.queue[P.idx]];
+  document.getElementById('practice-pos').textContent = `${P.idx + 1} / ${P.queue.length}`;
+  document.getElementById('btn-prev').disabled = P.idx === 0;
+  document.getElementById('btn-next').textContent = P.idx === P.queue.length - 1 ? '最后一题' : '下一题';
+  document.getElementById('btn-check').classList.toggle('hidden', P.checked || !!P.memo);
+  document.getElementById('btn-memo').textContent = P.memo ? '背题：开' : '背题：关';
+  document.getElementById('btn-fav').textContent = (PROGRESS.favorites || []).includes(q.id) ? '★ 已收藏' : '☆ 收藏';
+  const multi = q.answer.length > 1;
+  const card = document.getElementById('practice-card');
+  card.innerHTML = `
+    <div class="qmeta">第 ${q.id} 题 · ${esc(q.modules.join('、'))} · ${multi ? '多选题' : '单选题'} · 来源：${esc(q.source)}</div>
+    <div class="qstem">${esc(q.stem)}</div>
+    ${figsHtml(q)}
+    <div id="opts"></div>
+    <div id="feedback"></div>`;
+  const box = document.getElementById('opts');
+  for (const [letter, text] of Object.entries(q.options)) {
+    const b = document.createElement('button');
+    b.className = 'opt' + (P.picked.has(letter) ? ' sel' : '');
+    b.textContent = `${letter}. ${text}`;
+    b.onclick = () => {
+      if (P.checked || P.memo) return;
+      if (multi) { P.picked.has(letter) ? P.picked.delete(letter) : P.picked.add(letter); }
+      else { P.picked = new Set([letter]); }
+      renderPracticeQ();
+    };
+    // restore checked state styles
+    if (P.checked || P.memo) {
+      if (q.answer.includes(letter)) b.classList.add('correct');
+      else if (P.picked.has(letter)) b.classList.add('wrongpick');
+    }
+    box.appendChild(b);
+  }
+  if (P.checked) renderFeedback(q);
+  else if (P.memo) {
+    const fb = document.getElementById('feedback');
+    fb.className = 'feedback ok';
+    fb.innerHTML = `正确答案：<b>${q.answer.join('、')}</b>` + (q.note ? `<div class="note">注：${esc(q.note)}</div>` : '') + (q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : '') + resLinks(q);
+  }
+}
+function renderFeedback(q) {
+  const ok = sameSet([...P.picked], q.answer);
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback ' + (ok ? 'ok' : 'bad');
+  fb.innerHTML = `${ok ? '✅ 答对了' : '❌ 答错了'} · 正确答案：<b>${q.answer.join('、')}</b>` +
+    (q.note ? `<div class="note">注：${esc(q.note)}</div>` : '') +
+    (q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : '') + resLinks(q);
+}
+async function practiceCheck() {
+  if (P.memo) return;
+  const q = BYID[P.queue[P.idx]];
+  if (!P.picked.size) { alert('先选一个答案'); return; }
+  const ok = sameSet([...P.picked], q.answer);
+  P.checked = true;
+  await api('answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qid: q.id, correct: ok }) });
+  renderPracticeQ();
+}
+function practiceMove(d) {
+  const n = P.idx + d;
+  if (n < 0 || n >= P.queue.length) return;
+  P.idx = n; P.picked = new Set(); P.checked = false;
+  renderPracticeQ();
+}
+
+/* ---------- exam ---------- */
+let E = null, timerInt = null;
+function startExam(bank) {
+  const seen = new Set(), pool = [];
+  for (const q of QUESTIONS.filter(q => q.bank === bank)) {
+    if (seen.has(q.stem)) continue;
+    seen.add(q.stem); pool.push(q);
+  }
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const qs = pool.slice(0, 50);
+  E = { bank, qs, picks: qs.map(() => new Set()), left: 90 * 60 };
+  document.getElementById('exam-title').textContent = `模拟考试 · ${bank}（只抽这一组）`;
+  const list = document.getElementById('exam-list');
+  list.innerHTML = '';
+  qs.forEach((q, i) => {
+    const multi = q.answer.length > 1;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<div class="qmeta">${i + 1}. 第 ${q.id} 题 · ${esc(q.modules.join('、'))} · ${multi ? '多选' : '单选'}</div><div class="qstem">${esc(q.stem)}</div>${figsHtml(q)}`;
+    const box = document.createElement('div');
+    for (const [letter, text] of Object.entries(q.options)) {
+      const b = document.createElement('button');
+      b.className = 'opt';
+      b.textContent = `${letter}. ${text}`;
+      b.onclick = () => {
+        if (multi) { E.picks[i].has(letter) ? E.picks[i].delete(letter) : E.picks[i].add(letter); }
+        else E.picks[i] = new Set([letter]);
+        [...box.children].forEach((el, k) => el.classList.toggle('sel', E.picks[i].has(Object.keys(q.options)[k])));
+      };
+      box.appendChild(b);
+    }
+    card.appendChild(box);
+    list.appendChild(card);
+  });
+  show('view-exam');
+  stopTimer();
+  const tick = () => {
+    const m = String(Math.floor(E.left / 60)).padStart(2, '0'), s = String(E.left % 60).padStart(2, '0');
+    document.getElementById('exam-timer').textContent = `${m}:${s}`;
+    if (E.left <= 0) { stopTimer(); alert('时间到，自动交卷'); submitExam(); }
+    E.left--;
+  };
+  tick(); timerInt = setInterval(tick, 1000);
+}
+function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+async function submitExam() {
+  if (!E) return;
+  stopTimer();
+  const answers = E.qs.map((q, i) => ({ qid: q.id, correct: sameSet([...E.picks[i]], q.answer) }));
+  const correct = answers.filter(a => a.correct).length;
+  const score = Math.round(40 * correct / E.qs.length * 10) / 10;
+  await api('exam', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bank: E.bank, answers }) });
+  const passGate = correct >= Math.ceil(E.qs.length * 0.6);
+  document.getElementById('result-summary').innerHTML = `
+    <div class="sub" style="margin:0">本场题库组：${esc(E.bank)}</div>
+    <div class="big-score">${score} / 40 分</div>
+    <div style="line-height:1.8">答对 ${correct} / ${E.qs.length} 题 · 理论门槛（60%）：<span class="${passGate ? 'pass' : 'fail'}">${passGate ? '✅ 过门槛' : '❌ 差 ' + (Math.ceil(E.qs.length * 0.6) - correct) + ' 题过门槛'}</span><br>
+    <span style="color:var(--dim);font-size:13px">真实考试理论满分 40 分、须答对 60% 以上；本结果已存入进度。</span></div>`;
+  const rev = document.getElementById('result-review');
+  rev.innerHTML = '<div class="bankname" style="margin-bottom:6px">逐题回顾</div>' + E.qs.map((q, i) => {
+    const ok = answers[i].correct;
+    return `<div class="review-item">${ok ? '✅' : '❌'} <b>${i + 1}.</b> ${esc(q.stem)}<br>
+      <span style="color:var(--dim)">你的答案：${[...E.picks[i]].join('、') || '（未答）'} · 正确答案：${q.answer.join('、')}</span>
+      ${q.note ? `<div class="note">注：${esc(q.note)}</div>` : ''}${q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : ''}${resLinks(q)}</div>`;
+  }).join('');
+  E = null;
+  show('view-result');
+}
+
+/* ---------- init ---------- */
+(async () => {
+  QUESTIONS = await loadQuestions();
+  BYID = Object.fromEntries(QUESTIONS.map(q => [q.id, q]));
+  await refreshProgress();
+  flushOutbox();
+})();
 </script>
 </body>
 </html>
