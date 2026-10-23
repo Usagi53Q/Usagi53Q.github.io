@@ -120,13 +120,14 @@
 </div>
 
 <script>
-let BASE = 'https://acaa-quiz-api.usagi53q.workers.dev/5d3414c5f111cc536b7bf923/'; // build g: progress API on Cloudflare Workers (permanent address)
+let BASE = 'https://acaa-quiz-api.usagi53q.workers.dev/5d3414c5f111cc536b7bf923/'; // build h: progress API on Cloudflare Workers (permanent address)
 const PAGE_DIR = new URL('.', location.href).href;
 const BANKS = ['官方样题', '扩充题A', '扩充题B'];
 let QUESTIONS = [], BYID = {}, PROGRESS = null;
 let PROGRESS_LIVE = false, PROGRESS_AT = 0;
 let PROGRESS_SRC = '';
 const FIGMAP = {};
+const FIGTRY = {};
 function ensureFig(f) {
   if (FIGMAP[f]) return;
   FIGMAP[f] = 'loading';
@@ -137,13 +138,22 @@ function ensureFig(f) {
       if (j && j.data) {
         FIGMAP[f] = j.data;
         document.querySelectorAll('img[data-fig="' + f + '"]').forEach(im => { im.src = j.data; });
-      } else { delete FIGMAP[f]; }
+      } else { figRetry(f); }
     })
-    .catch(() => { delete FIGMAP[f]; });
+    .catch(() => { figRetry(f); });
+}
+function figRetry(f) {
+  delete FIGMAP[f];
+  FIGTRY[f] = (FIGTRY[f] || 0) + 1;
+  if (FIGTRY[f] <= 3) setTimeout(() => ensureFig(f), 800 * FIGTRY[f]);
+}
+function figFallback(im) {
+  const f = im.getAttribute('data-fig');
+  if (f && !FIGMAP[f]) ensureFig(f);
 }
 
 async function resolveBase() {
-  // build g: the progress API lives at a permanent workers.dev address;
+  // build h: the progress API lives at a permanent workers.dev address;
   // there is no rotating tunnel locator to resolve anymore.
 }
 setInterval(() => { resolveBase().then(() => { flushOutbox(); refreshProgress(); }); }, 60000);
@@ -218,7 +228,7 @@ function resLinks(q) {
 function figsHtml(q) {
   if (q.figures && q.figures.length) {
     q.figures.forEach(f => ensureFig(f));
-    return `<div class="qfigs">${q.figures.map(f => `<img data-fig="${f}" src="${FIGMAP[f] && FIGMAP[f] !== 'loading' ? FIGMAP[f] : BASE + 'figs/' + f}" alt="题图" loading="lazy">`).join('')}</div>`;
+    return `<div class="qfigs">${q.figures.map(f => `<img data-fig="${f}" src="${FIGMAP[f] && FIGMAP[f] !== 'loading' ? FIGMAP[f] : BASE + 'figs/' + f}" alt="题图" loading="lazy" onerror="figFallback(this)">`).join('')}</div>`;
   }
   if (q.hasFigure) return '<div class="fig" style="margin-bottom:10px">📷 本题带图，请对照学校样题原 PDF 查看题图</div>';
   return '';
@@ -234,7 +244,7 @@ function show(id) {
   window.scrollTo(0, 0);
 }
 async function refreshProgress() {
-  // build g: live API is the single source of truth (no tunnel, no mirror).
+  // build h: live API is the single source of truth (no tunnel, no mirror).
   try {
     PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_SRC = 'live'; PROGRESS_AT = Date.now();
     try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
@@ -257,10 +267,10 @@ async function refreshProgress() {
 function renderHome() {
   const sb = document.getElementById('sync-banner');
   if (sb) sb.innerHTML = PROGRESS_LIVE
-    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build g</div>'
+    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build h</div>'
     : (PROGRESS_SRC === 'mirror'
-      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build g</div>'
-      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build g</div>');
+      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build h</div>'
+      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build h</div>');
   const list = document.getElementById('bank-list');
   list.innerHTML = '';
   for (const bank of BANKS) {
