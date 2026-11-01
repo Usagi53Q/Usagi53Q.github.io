@@ -35,6 +35,8 @@
   .feedback.bad { background:rgba(229,72,77,.15); }
   .note { color:var(--warn); font-size:12px; margin-top:6px; line-height:1.6; }
   .explain { color:var(--dim); font-size:13px; margin-top:6px; line-height:1.7; }
+  .koujue { margin-top:8px; padding:8px 10px; border-left:3px solid #5eead4; background:rgba(94,234,212,.08); border-radius:0 8px 8px 0; font-size:14px; line-height:1.6; }
+  .koujue b { color:#5eead4; }
 .reslinks { margin-top:8px; font-size:13px; color:var(--dim); line-height:2; }
 .reslinks a { color:var(--accent); margin-right:14px; text-decoration:none; white-space:nowrap; }
   .fig { color:var(--warn); font-size:12px; }
@@ -65,11 +67,6 @@
       <div class="row" id="wrong-btns"></div>
     </div>
     <div class="card">
-      <div class="bankname">历史错题</div>
-      <div class="stats" id="history-stat">加载中…</div>
-      <div class="row" id="history-btns"></div>
-    </div>
-    <div class="card">
       <div class="bankname">收藏夹</div>
       <div class="stats" id="fav-stat">加载中…</div>
       <div class="row" id="fav-btns"></div>
@@ -77,6 +74,11 @@
     <div class="card">
       <div class="bankname">模拟成绩</div>
       <div class="stats" id="exam-history">加载中…</div>
+    </div>
+    <div class="card">
+      <div class="bankname">🧠 考前速记</div>
+      <div class="stats">官方 102 题，每题一句速记口诀；答完题反馈区也会自动显示。</div>
+      <div class="row"><button class="primary" onclick="renderCram()">打开速记表</button></div>
     </div>
   </div>
 
@@ -117,17 +119,27 @@
     <div class="card" id="result-summary"></div>
     <div class="card" id="result-review"></div>
   </div>
+
+  <!-- CRAM -->
+  <div id="view-cram" class="hidden">
+    <div class="topbar">
+      <button class="back" onclick="goHome()">← 返回首页</button>
+      <div class="title">考前速记 · 官方102题口诀</div>
+    </div>
+    <div class="card"><div class="sub" style="margin:0">每题一句口诀，考前快速过一遍。按模块分组，题号对应题库。</div></div>
+    <div id="cram-list"></div>
+  </div>
 </div>
 
 <script>
-let BASE = 'https://acaa-quiz-api.usagi53q.workers.dev/5d3414c5f111cc536b7bf923/'; // build j: progress API on Cloudflare Workers (permanent address)
+let BASE = new URL(location.pathname.replace(/\/?$/, '/'), location.origin).href;
 const PAGE_DIR = new URL('.', location.href).href;
 const BANKS = ['官方样题', '扩充题A', '扩充题B'];
 let QUESTIONS = [], BYID = {}, PROGRESS = null;
+let MNEMONICS = {};
 let PROGRESS_LIVE = false, PROGRESS_AT = 0;
 let PROGRESS_SRC = '';
 const FIGMAP = {};
-const FIGTRY = {};
 function ensureFig(f) {
   if (FIGMAP[f]) return;
   FIGMAP[f] = 'loading';
@@ -138,131 +150,21 @@ function ensureFig(f) {
       if (j && j.data) {
         FIGMAP[f] = j.data;
         document.querySelectorAll('img[data-fig="' + f + '"]').forEach(im => { im.src = j.data; });
-      } else { figRetry(f); }
+      } else { delete FIGMAP[f]; }
     })
-    .catch(() => { figRetry(f); });
-}
-function figRetry(f) {
-  delete FIGMAP[f];
-  FIGTRY[f] = (FIGTRY[f] || 0) + 1;
-  if (FIGTRY[f] <= 3) setTimeout(() => ensureFig(f), 800 * FIGTRY[f]);
-}
-function figFallback(im) {
-  const f = im.getAttribute('data-fig');
-  if (f && !FIGMAP[f]) ensureFig(f);
-}
-
-/* build j: warm the browser HTTP cache with every figure at startup (idle,
-   2 at a time, bank order as in QUESTIONS). The Worker serves figures with a
-   7-day cache header, so a warmed figure renders instantly with no network. */
-const FIGPRE = { queue: [], seen: new Set(), active: 0 };
-function prefetchFig(f, front) {
-  if (!f) return;
-  if (FIGMAN.manifest) { figmanQueue(f, front); return; }
-  if (FIGPRE.seen.has(f)) return;
-  FIGPRE.seen.add(f);
-  if (front) FIGPRE.queue.unshift(f); else FIGPRE.queue.push(f);
-  pumpFigPre();
-}
-function pumpFigPre() {
-  while (FIGPRE.active < 2 && FIGPRE.queue.length) {
-    const f = FIGPRE.queue.shift();
-    FIGPRE.active++;
-    const im = new Image();
-    im.onload = im.onerror = () => { FIGPRE.active--; pumpFigPre(); };
-    im.src = BASE + 'figs/' + f;
-  }
-}
-function prefetchAllFigs() {
-  if (navigator.connection && navigator.connection.saveData) return;
-  if (window.caches) { figmanStart().then(ok => { if (!ok) for (const q of QUESTIONS) for (const f of (q.figures || [])) prefetchFig(f, false); }); return; }
-  for (const q of QUESTIONS) for (const f of (q.figures || [])) prefetchFig(f, false);
-}
-
-/* build j: persistent local figure library (Cache Storage) checked against a
-   cloud manifest (figmanifest.json: per-file md5). Unchanged figures are
-   served from the device with zero network; only missing or changed figures
-   are downloaded in the background and swapped in place. */
-const FIGSRC = {};
-const FIGMAN = { queue: [], active: 0, md5: {}, manifest: null };
-async function figmanStart() {
-  try {
-    const mr = await fetch(PAGE_DIR + 'figmanifest.json', { cache: 'no-store' });
-    if (!mr.ok) return false;
-    FIGMAN.manifest = await mr.json();
-  } catch (e) { return false; }
-  try { FIGMAN.md5 = JSON.parse(localStorage.getItem('figMd5Map') || '{}'); } catch (e) { FIGMAN.md5 = {}; }
-  let cache;
-  try { cache = await caches.open('quiz-figs-v1'); } catch (e) { return false; }
-  const files = Object.keys(FIGMAN.manifest.files || {});
-  for (const f of Object.keys(FIGMAN.md5)) {
-    if (!files.includes(f)) { try { await cache.delete(BASE + 'figs/' + f); } catch (e) {} delete FIGMAN.md5[f]; }
-  }
-  for (const f of files) {
-    const want = FIGMAN.manifest.files[f].md5;
-    let hit = null;
-    if (FIGMAN.md5[f] === want) { try { hit = await cache.match(BASE + 'figs/' + f); } catch (e) {} }
-    if (hit) {
-      try { FIGSRC[f] = URL.createObjectURL(await hit.blob()); } catch (e) { figmanQueue(f, false); }
-    } else {
-      figmanQueue(f, false);
-    }
-  }
-  try { localStorage.setItem('figMd5Map', JSON.stringify(FIGMAN.md5)); } catch (e) {}
-  return true;
-}
-function figmanQueue(f, front) {
-  if (FIGSRC[f]) return;
-  const i = FIGMAN.queue.indexOf(f);
-  if (i >= 0) { if (front) { FIGMAN.queue.splice(i, 1); FIGMAN.queue.unshift(f); } return; }
-  if (front) FIGMAN.queue.unshift(f); else FIGMAN.queue.push(f);
-  figmanPump();
-}
-async function figmanPump() {
-  if (FIGMAN.active >= 2 || !FIGMAN.queue.length || !FIGMAN.manifest) return;
-  const f = FIGMAN.queue.shift();
-  FIGMAN.active++;
-  try {
-    const url = BASE + 'figs/' + f;
-    const r = await fetch(url);
-    if (r.ok) {
-      try { const cache = await caches.open('quiz-figs-v1'); await cache.put(url, r.clone()); } catch (e) {}
-      const blob = await r.blob();
-      const old = FIGSRC[f];
-      FIGSRC[f] = URL.createObjectURL(blob);
-      if (old) URL.revokeObjectURL(old);
-      FIGMAN.md5[f] = FIGMAN.manifest.files[f].md5;
-      try { localStorage.setItem('figMd5Map', JSON.stringify(FIGMAN.md5)); } catch (e) {}
-      document.querySelectorAll('img[data-fig="' + f + '"]').forEach(im => { if (!im.src.startsWith('data:')) im.src = FIGSRC[f]; });
-    }
-  } catch (e) {}
-  FIGMAN.active--;
-  figmanPump();
-}
-function prefetchUpcoming(queue, idx) {
-  for (let k = Math.min(idx + 2, queue.length - 1); k > idx; k--) {
-    const nq = BYID[queue[k]];
-    if (nq && nq.figures) nq.figures.forEach(f => prefetchFig(f, true));
-  }
-}
-let FIGHEAL_PENDING = false;
-function scheduleFigHeal() {
-  if (FIGHEAL_PENDING) return;
-  FIGHEAL_PENDING = true;
-  setTimeout(() => {
-    FIGHEAL_PENDING = false;
-    document.querySelectorAll('img[data-fig]').forEach(im => {
-      if (!im.complete || im.naturalWidth === 0) {
-        const f = im.getAttribute('data-fig');
-        if (f && !FIGMAP[f]) ensureFig(f);
-      }
-    });
-  }, 2500);
+    .catch(() => { delete FIGMAP[f]; });
 }
 
 async function resolveBase() {
-  // build j: the progress API lives at a permanent workers.dev address;
-  // there is no rotating tunnel locator to resolve anymore.
+  try {
+    const r = await fetch('https://usagi53q.github.io/quiz-url.json?ts=' + Date.now(), { cache: 'no-store' });
+    const j = await r.json();
+    if (j && j.url && j.url !== BASE) {
+      const old = BASE;
+      BASE = j.url;
+      document.querySelectorAll('img').forEach(im => { if (im.src.startsWith(old)) im.src = BASE + im.src.slice(old.length); });
+    }
+  } catch (e) { /* keep current BASE */ }
 }
 setInterval(() => { resolveBase().then(() => { flushOutbox(); refreshProgress(); }); }, 60000);
 function queueOutbox(path, opts) {
@@ -326,6 +228,14 @@ const RESOURCES = {
   '3D': { doc: null, kw: 'Photoshop 3D 功能 教程' },
   '_通用': { doc: ['Adobe 官方文档：Photoshop 入门', 'https://helpx.adobe.com/cn/photoshop/get-started.html'], kw: 'Photoshop 基础教程 入门' }
 };
+function mnemonicFor(q) {
+  if (q.id === 45 && q.stem.includes('描边')) return MNEMONICS['45b']; // 题库里有两道45题，第一道是描边题
+  return MNEMONICS[q.id];
+}
+function koujueHtml(q) {
+  const k = mnemonicFor(q);
+  return k ? `<div class="koujue">🧠 <b>速记口诀</b>：${esc(k)}</div>` : '';
+}
 function resLinks(q) {
   const mod = (q.modules || []).find(m => RESOURCES[m]);
   const r = mod ? RESOURCES[mod] : RESOURCES['_通用'];
@@ -335,8 +245,8 @@ function resLinks(q) {
 }
 function figsHtml(q) {
   if (q.figures && q.figures.length) {
-    scheduleFigHeal();
-    return `<div class="qfigs">${q.figures.map(f => `<img data-fig="${f}" src="${FIGMAP[f] && FIGMAP[f] !== 'loading' ? FIGMAP[f] : (FIGSRC[f] || BASE + 'figs/' + f)}" alt="题图" loading="lazy" onerror="figFallback(this)">`).join('')}</div>`;
+    q.figures.forEach(f => ensureFig(f));
+    return `<div class="qfigs">${q.figures.map(f => `<img data-fig="${f}" src="${FIGMAP[f] && FIGMAP[f] !== 'loading' ? FIGMAP[f] : BASE + 'figs/' + f}" alt="题图" loading="lazy">`).join('')}</div>`;
   }
   if (q.hasFigure) return '<div class="fig" style="margin-bottom:10px">📷 本题带图，请对照学校样题原 PDF 查看题图</div>';
   return '';
@@ -346,13 +256,25 @@ function sameSet(a, b) {
   const s = new Set(b); return a.every(x => s.has(x));
 }
 function show(id) {
-  for (const v of ['view-home','view-practice','view-exam','view-result']) {
+  for (const v of ['view-home','view-practice','view-exam','view-result','view-cram']) {
     document.getElementById(v).classList.toggle('hidden', v !== id);
   }
   window.scrollTo(0, 0);
 }
 async function refreshProgress() {
-  // build j: live API is the single source of truth (no tunnel, no mirror).
+  // Same-origin static mirror first (exists on the Pages deployment): the
+  // server pushes progress-mirror.json whenever progress changes, so the
+  // displayed stats never depend on the tunnel being alive at this moment.
+  try {
+    const mr = await fetch('progress-mirror.json?t=' + Date.now(), { cache: 'no-store' });
+    if (mr.ok) {
+      const mj = await mr.json();
+      if (mj && mj.banks) {
+        PROGRESS = mj; PROGRESS_SRC = 'mirror'; PROGRESS_AT = Date.now();
+        try { localStorage.setItem('progCache', JSON.stringify(mj)); } catch (e) {}
+      }
+    }
+  } catch (e) {}
   try {
     PROGRESS = await api('progress'); PROGRESS_LIVE = true; PROGRESS_SRC = 'live'; PROGRESS_AT = Date.now();
     try { localStorage.setItem('progCache', JSON.stringify(PROGRESS)); } catch (e) {}
@@ -367,7 +289,7 @@ async function refreshProgress() {
     if (!PROGRESS) {
       try { PROGRESS = JSON.parse(localStorage.getItem('progCache') || 'null'); if (PROGRESS) PROGRESS_SRC = 'cache'; } catch (e2) {}
     }
-    if (!PROGRESS) { PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [], wrongHistory: [] }; PROGRESS_SRC = 'empty'; }
+    if (!PROGRESS) { PROGRESS = { banks: {}, examCount: 0, wrongTotal: 0, practicedIds: [], favorites: [], exams: [] }; PROGRESS_SRC = 'empty'; }
   }
   renderHome();
 }
@@ -375,10 +297,10 @@ async function refreshProgress() {
 function renderHome() {
   const sb = document.getElementById('sync-banner');
   if (sb) sb.innerHTML = PROGRESS_LIVE
-    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build j</div>'
+    ? '<div class="note" style="border-color:#5eead4;color:#5eead4">☁️ 进度已同步 · ' + new Date(PROGRESS_AT).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · build e</div>'
     : (PROGRESS_SRC === 'mirror'
-      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build j</div>'
-      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build j</div>');
+      ? '<div class="note" style="border-color:#7dd3fc;color:#7dd3fc">☁️ 已载入云端进度镜像（自动更新）；实时同步通道恢复后会对齐到最新 · build e</div>'
+      : '<div class="note" style="border-color:#fbbf24;color:#fbbf24">⚠️ 暂时连不上进度服务器，下面数字可能不是最新；答题会先存本机、恢复后自动同步 · build e</div>');
   const list = document.getElementById('bank-list');
   list.innerHTML = '';
   for (const bank of BANKS) {
@@ -414,21 +336,6 @@ function renderHome() {
     }
   }
   if (!wb.children.length) wb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无错题</span>';
-  const hist = PROGRESS.wrongHistory || [];
-  const fixedCount = hist.filter(h => !h.inBook).length;
-  document.getElementById('history-stat').innerHTML = `共 <b>${hist.length}</b> 道曾经答错的题（其中 <b>${fixedCount}</b> 道已订正）<br>答对移出错题本后，这里仍会保留，随时可再练`;
-  const hb = document.getElementById('history-btns');
-  hb.innerHTML = '';
-  for (const bank of BANKS) {
-    const ids = hist.filter(h => BYID[h.id] && BYID[h.id].bank === bank);
-    if (ids.length) {
-      const b = document.createElement('button');
-      b.textContent = `${bank}历史错题（${ids.length}）`;
-      b.onclick = () => startHistoryPractice(bank);
-      hb.appendChild(b);
-    }
-  }
-  if (!hb.children.length) hb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无历史错题</span>';
   const favs = PROGRESS.favorites || [];
   document.getElementById('fav-stat').innerHTML = `共 <b>${favs.length}</b> 道收藏题（练习时点「☆ 收藏」添加）`;
   const fb = document.getElementById('fav-btns');
@@ -477,6 +384,18 @@ function toggleMods(bank) {
 }
 function goHome() { stopTimer(); show('view-home'); refreshProgress(); }
 
+/* ---------- cram ---------- */
+function renderCram() {
+  const qs = QUESTIONS.filter(q => q.bank === '官方样题' && mnemonicFor(q));
+  const groups = {};
+  for (const q of qs) { const m = (q.modules && q.modules[0]) || '其他'; (groups[m] = groups[m] || []).push(q); }
+  document.getElementById('cram-list').innerHTML = Object.entries(groups).map(([m, list]) =>
+    `<div class="card"><div class="bankname" style="margin-bottom:8px">${esc(m)}（${list.length}）</div>` +
+    list.map(q => `<div class="review-item">Q${q.id} · 🧠 ${esc(mnemonicFor(q))}<br><span style="color:var(--dim);font-size:12px">${esc(q.stem.slice(0, 42))}${q.stem.length > 42 ? '…' : ''} → <b style="color:var(--txt)">${q.answer.join('、')}</b></span></div>`).join('') + `</div>`
+  ).join('') || '<div class="card">口诀加载失败</div>';
+  show('view-cram');
+}
+
 /* ---------- practice ---------- */
 let P = null; // {title, queue:[qid], idx, picked:Set, checked:bool}
 function startPractice(bank, module, shuffle) {
@@ -511,14 +430,6 @@ async function toggleFav() {
   if (fav) favs.push(q.id); else PROGRESS.favorites = favs.filter(id => id !== q.id);
   renderPracticeQ();
 }
-async function startHistoryPractice(bank) {
-  const hist = PROGRESS.wrongHistory || [];
-  const ids = hist.map(h => h.id).filter(id => BYID[id] && BYID[id].bank === bank);
-  if (!ids.length) return;
-  P = { title: '历史错题 · ' + bank, queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank };
-  document.getElementById('practice-title').textContent = P.title;
-  show('view-practice'); renderPracticeQ();
-}
 async function startWrongPractice(bank) {
   const wrong = await api('wrong');
   const ids = wrong.filter(id => BYID[id] && BYID[id].bank === bank);
@@ -529,7 +440,6 @@ async function startWrongPractice(bank) {
 }
 function renderPracticeQ() {
   const q = BYID[P.queue[P.idx]];
-  prefetchUpcoming(P.queue, P.idx);
   document.getElementById('practice-pos').textContent = `${P.idx + 1} / ${P.queue.length}`;
   document.getElementById('btn-prev').disabled = P.idx === 0;
   document.getElementById('btn-next').textContent = P.idx === P.queue.length - 1 ? '最后一题' : '下一题';
@@ -566,7 +476,7 @@ function renderPracticeQ() {
   else if (P.memo) {
     const fb = document.getElementById('feedback');
     fb.className = 'feedback ok';
-    fb.innerHTML = `正确答案：<b>${q.answer.join('、')}</b>` + (q.note ? `<div class="note">注：${esc(q.note)}</div>` : '') + (q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : '') + resLinks(q);
+    fb.innerHTML = `正确答案：<b>${q.answer.join('、')}</b>` + (q.note ? `<div class="note">注：${esc(q.note)}</div>` : '') + (q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : '') + koujueHtml(q) + resLinks(q);
   }
 }
 function renderFeedback(q) {
@@ -575,7 +485,7 @@ function renderFeedback(q) {
   fb.className = 'feedback ' + (ok ? 'ok' : 'bad');
   fb.innerHTML = `${ok ? '✅ 答对了' : '❌ 答错了'} · 正确答案：<b>${q.answer.join('、')}</b>` +
     (q.note ? `<div class="note">注：${esc(q.note)}</div>` : '') +
-    (q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : '') + resLinks(q);
+    (q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : '') + koujueHtml(q) + resLinks(q);
 }
 async function practiceCheck() {
   if (P.memo) return;
@@ -604,7 +514,6 @@ function startExam(bank) {
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const qs = pool.slice(0, 50);
   E = { bank, qs, picks: qs.map(() => new Set()), left: 90 * 60 };
-  qs.forEach(q => (q.figures || []).forEach(f => prefetchFig(f, true)));
   document.getElementById('exam-title').textContent = `模拟考试 · ${bank}（只抽这一组）`;
   const list = document.getElementById('exam-list');
   list.innerHTML = '';
@@ -657,7 +566,7 @@ async function submitExam() {
     const ok = answers[i].correct;
     return `<div class="review-item">${ok ? '✅' : '❌'} <b>${i + 1}.</b> ${esc(q.stem)}<br>
       <span style="color:var(--dim)">你的答案：${[...E.picks[i]].join('、') || '（未答）'} · 正确答案：${q.answer.join('、')}</span>
-      ${q.note ? `<div class="note">注：${esc(q.note)}</div>` : ''}${q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : ''}${resLinks(q)}</div>`;
+      ${q.note ? `<div class="note">注：${esc(q.note)}</div>` : ''}${q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : ''}${koujueHtml(q)}${resLinks(q)}</div>`;
   }).join('');
   E = null;
   show('view-result');
@@ -667,9 +576,8 @@ async function submitExam() {
 (async () => {
   QUESTIONS = await loadQuestions();
   BYID = Object.fromEntries(QUESTIONS.map(q => [q.id, q]));
+  try { MNEMONICS = await (await fetch(PAGE_DIR + 'mnemonics.json', { cache: 'no-store' })).json(); } catch (e) { MNEMONICS = {}; }
   await refreshProgress();
-  if (window.requestIdleCallback) requestIdleCallback(() => prefetchAllFigs(), { timeout: 3000 });
-  else setTimeout(prefetchAllFigs, 1500);
   flushOutbox();
 })();
 </script>
