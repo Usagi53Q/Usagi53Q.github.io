@@ -72,6 +72,11 @@
       <div class="row" id="history-btns"></div>
     </div>
     <div class="card">
+      <div class="bankname">🎯 顽固题</div>
+      <div class="stats" id="stubborn-stat">加载中…</div>
+      <div class="row" id="stubborn-btns"></div>
+    </div>
+    <div class="card">
       <div class="bankname">收藏夹</div>
       <div class="stats" id="fav-stat">加载中…</div>
       <div class="row" id="fav-btns"></div>
@@ -455,6 +460,17 @@ function renderHome() {
     }
   }
   if (!hb.children.length) hb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无历史错题</span>';
+  const stub = (PROGRESS.wrongHistory || []).filter(h => h.w >= 2 && BYID[h.id]);
+  document.getElementById('stubborn-stat').innerHTML = `共 <b>${stub.length}</b> 道错过 2 次以上的题（历史顽固题，答对不会移出这个区）`;
+  const sbb = document.getElementById('stubborn-btns');
+  sbb.innerHTML = '';
+  if (stub.length) {
+    const b = document.createElement('button');
+    b.className = 'primary';
+    b.textContent = `开始练习（${stub.length}）`;
+    b.onclick = () => startStubbornPractice();
+    sbb.appendChild(b);
+  } else sbb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无顽固题</span>';
   const favs = PROGRESS.favorites || [];
   document.getElementById('fav-stat').innerHTML = `共 <b>${favs.length}</b> 道收藏题（练习时点「☆ 收藏」添加）`;
   const fb = document.getElementById('fav-btns');
@@ -554,6 +570,13 @@ async function startHistoryPractice(bank) {
   const ids = hist.map(h => h.id).filter(id => BYID[id] && BYID[id].bank === bank);
   if (!ids.length) return;
   P = { title: '历史错题 · ' + bank, queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank };
+  document.getElementById('practice-title').textContent = P.title;
+  show('view-practice'); renderPracticeQ();
+}
+function startStubbornPractice() {
+  const ids = (PROGRESS.wrongHistory || []).filter(h => h.w >= 2 && BYID[h.id]).map(h => h.id);
+  if (!ids.length) return;
+  P = { title: '顽固题重练（错过2次以上）', queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank: '官方样题' };
   document.getElementById('practice-title').textContent = P.title;
   show('view-practice'); renderPracticeQ();
 }
