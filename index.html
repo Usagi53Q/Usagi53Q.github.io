@@ -662,11 +662,17 @@ function startExam(bank) {
     if (seen.has(q.stem)) continue;
     seen.add(q.stem); pool.push(q);
   }
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  const qs = pool.slice(0, 50);
+  let lastIds = [];
+  try { lastIds = JSON.parse(localStorage.getItem('lastExamQids_' + bank) || '[]'); } catch (e) { lastIds = []; }
+  const lastSet = new Set(lastIds);
+  const shuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } };
+  const fresh = pool.filter(q => !lastSet.has(q.id)), used = pool.filter(q => lastSet.has(q.id));
+  shuf(fresh); shuf(used);
+  const qs = fresh.concat(used).slice(0, 50);
+  const avoided = lastSet.size > 0 && fresh.length >= 50;
   E = { bank, qs, picks: qs.map(() => new Set()), left: 90 * 60 };
   qs.forEach(q => (q.figures || []).forEach(f => prefetchFig(f, true)));
-  document.getElementById('exam-title').textContent = `模拟考试 · ${bank}（只抽这一组）`;
+  document.getElementById('exam-title').textContent = `模拟考试 · ${bank}（${avoided ? '已避开上一套的题' : '随机抽题'}）`;
   const list = document.getElementById('exam-list');
   list.innerHTML = '';
   qs.forEach((q, i) => {
@@ -720,6 +726,7 @@ async function submitExam() {
       <span style="color:var(--dim)">你的答案：${[...E.picks[i]].join('、') || '（未答）'} · 正确答案：${q.answer.join('、')}</span>
       ${q.note ? `<div class="note">注：${esc(q.note)}</div>` : ''}${q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : ''}${koujueHtml(q)}${resLinks(q)}</div>`;
   }).join('');
+  try { localStorage.setItem('lastExamQids_' + E.bank, JSON.stringify(E.qs.map(q => q.id))); } catch (e) {}
   E = null;
   show('view-result');
 }
