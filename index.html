@@ -494,6 +494,11 @@ function renderHome() {
     const gate = ex.correct >= Math.ceil(ex.total * 0.6);
     return `${ds} · ${esc(ex.bank)} · <b>${ex.score}/40</b> · 答对 ${ex.correct}/${ex.total} · <span class="${gate ? 'pass' : 'fail'}">${gate ? '✅ 过门槛' : '❌ 未过门槛'}</span>`;
   }).join('<br>');
+  let snap = null;
+  try { snap = JSON.parse(localStorage.getItem('lastExamReview') || 'null'); } catch (e) {}
+  if (snap && snap.items && snap.items.length) {
+    eh.innerHTML += '<br><button class="primary" style="margin-top:8px" onclick="showLastExamReview()">查看上次逐题回顾</button>';
+  }
   renderCountdown();
 }
 function renderCountdown() {
@@ -710,24 +715,46 @@ async function submitExam() {
   if (!E) return;
   stopTimer();
   const answers = E.qs.map((q, i) => ({ qid: q.id, correct: sameSet([...E.picks[i]], q.answer) }));
-  const correct = answers.filter(a => a.correct).length;
-  const score = Math.round(40 * correct / E.qs.length * 10) / 10;
   await api('exam', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bank: E.bank, answers }) });
-  const passGate = correct >= Math.ceil(E.qs.length * 0.6);
+  try { localStorage.setItem('lastExamReview', JSON.stringify({ bank: E.bank, at: Date.now(), items: E.qs.map((q, i) => ({ qid: q.id, picks: [...E.picks[i]], correct: answers[i].correct })) })); } catch (e) {}
+  try { localStorage.setItem('lastExamQids_' + E.bank, JSON.stringify(E.qs.map(q => q.id))); } catch (e) {}
+  renderExamResult(E.bank, E.qs, E.picks.map(p => [...p]), answers.map(a => a.correct), '本场题库组：' + E.bank);
+  E = null;
+  show('view-result');
+}
+function renderExamResult(bank, qs, picksArr, correctFlags, sub) {
+  const total = qs.length;
+  const correct = correctFlags.filter(Boolean).length;
+  const score = Math.round(40 * correct / total * 10) / 10;
+  const passGate = correct >= Math.ceil(total * 0.6);
   document.getElementById('result-summary').innerHTML = `
-    <div class="sub" style="margin:0">本场题库组：${esc(E.bank)}</div>
+    <div class="sub" style="margin:0">${esc(sub)}</div>
     <div class="big-score">${score} / 40 分</div>
-    <div style="line-height:1.8">答对 ${correct} / ${E.qs.length} 题 · 理论门槛（60%）：<span class="${passGate ? 'pass' : 'fail'}">${passGate ? '✅ 过门槛' : '❌ 差 ' + (Math.ceil(E.qs.length * 0.6) - correct) + ' 题过门槛'}</span><br>
+    <div style="line-height:1.8">答对 ${correct} / ${total} 题 · 理论门槛（60%）：<span class="${passGate ? 'pass' : 'fail'}">${passGate ? '✅ 过门槛' : '❌ 差 ' + (Math.ceil(total * 0.6) - correct) + ' 题过门槛'}</span><br>
     <span style="color:var(--dim);font-size:13px">真实考试理论满分 40 分、须答对 60% 以上；本结果已存入进度。</span></div>`;
   const rev = document.getElementById('result-review');
-  rev.innerHTML = '<div class="bankname" style="margin-bottom:6px">逐题回顾</div>' + E.qs.map((q, i) => {
-    const ok = answers[i].correct;
-    return `<div class="review-item">${ok ? '✅' : '❌'} <b>${i + 1}.</b> ${esc(q.stem)}<br>
-      <span style="color:var(--dim)">你的答案：${[...E.picks[i]].join('、') || '（未答）'} · 正确答案：${q.answer.join('、')}</span>
+  rev.innerHTML = '<div class="bankname" style="margin-bottom:6px">逐题回顾</div>' + qs.map((q, i) => {
+    const ok = correctFlags[i];
+    const picks = picksArr[i] || [];
+    return `<div class="review-item">${ok ? '✅' : '❌'} <b>${i + 1}.</b> ${esc(q.stem)}<br>${figsHtml(q)}
+      <span style="color:var(--dim)">你的答案：${[...picks].join('、') || '（未答）'} · 正确答案：${q.answer.join('、')}</span>
       ${q.note ? `<div class="note">注：${esc(q.note)}</div>` : ''}${q.explain ? `<div class="explain">解析：${esc(q.explain)}</div>` : ''}${koujueHtml(q)}${resLinks(q)}</div>`;
   }).join('');
-  try { localStorage.setItem('lastExamQids_' + E.bank, JSON.stringify(E.qs.map(q => q.id))); } catch (e) {}
-  E = null;
+}
+function showLastExamReview() {
+  let snap = null;
+  try { snap = JSON.parse(localStorage.getItem('lastExamReview') || 'null'); } catch (e) {}
+  if (!snap || !snap.items || !snap.items.length) return;
+  const qs = [], picksArr = [], flags = [];
+  for (const it of snap.items) {
+    const q = BYID[it.qid];
+    if (!q) continue;
+    qs.push(q); picksArr.push(it.picks || []); flags.push(!!it.correct);
+  }
+  if (!qs.length) return;
+  const d = new Date(snap.at);
+  const ds = `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  renderExamResult(snap.bank, qs, picksArr, flags, `上次回顾 · ${ds} · ${snap.bank}`);
   show('view-result');
 }
 
