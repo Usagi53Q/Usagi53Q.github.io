@@ -77,6 +77,11 @@
       <div class="row" id="stubborn-btns"></div>
     </div>
     <div class="card">
+      <div class="bankname">📝 模考错题</div>
+      <div class="stats" id="examwrong-stat">加载中…</div>
+      <div class="row" id="examwrong-btns"></div>
+    </div>
+    <div class="card">
       <div class="bankname">收藏夹</div>
       <div class="stats" id="fav-stat">加载中…</div>
       <div class="row" id="fav-btns"></div>
@@ -471,6 +476,23 @@ function renderHome() {
     b.onclick = () => startStubbornPractice();
     sbb.appendChild(b);
   } else sbb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无顽固题</span>';
+  const ewb = document.getElementById('examwrong-btns');
+  ewb.innerHTML = '';
+  let ewTotal = 0;
+  for (const bank of BANKS) {
+    let ids = [];
+    try { ids = JSON.parse(localStorage.getItem('examWrongQids_' + bank) || '[]').filter(id => BYID[id]); } catch (e) {}
+    ewTotal += ids.length;
+    if (ids.length) {
+      const b = document.createElement('button');
+      b.className = 'primary';
+      b.textContent = `${bank}模考错题（${ids.length}）`;
+      b.onclick = () => startExamWrongPractice(bank);
+      ewb.appendChild(b);
+    }
+  }
+  document.getElementById('examwrong-stat').innerHTML = `共 <b>${ewTotal}</b> 道模考中答错过的题（累计收录，交卷后自动记入，答对不移出）`;
+  if (!ewb.children.length) ewb.innerHTML = '<span style="color:var(--dim);font-size:13px">暂无模考错题</span>';
   const favs = PROGRESS.favorites || [];
   document.getElementById('fav-stat').innerHTML = `共 <b>${favs.length}</b> 道收藏题（练习时点「☆ 收藏」添加）`;
   const fb = document.getElementById('fav-btns');
@@ -582,6 +604,14 @@ function startStubbornPractice() {
   const ids = (PROGRESS.wrongHistory || []).filter(h => h.w >= 2 && BYID[h.id]).map(h => h.id);
   if (!ids.length) return;
   P = { title: '顽固题重练（错过2次以上）', queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank: '官方样题' };
+  document.getElementById('practice-title').textContent = P.title;
+  show('view-practice'); renderPracticeQ();
+}
+function startExamWrongPractice(bank) {
+  let ids = [];
+  try { ids = JSON.parse(localStorage.getItem('examWrongQids_' + bank) || '[]').filter(id => BYID[id]); } catch (e) {}
+  if (!ids.length) return;
+  P = { title: '模考错题重练 · ' + bank, queue: ids, idx: 0, picked: new Set(), checked: false, mode: 'practice', bank };
   document.getElementById('practice-title').textContent = P.title;
   show('view-practice'); renderPracticeQ();
 }
@@ -718,6 +748,12 @@ async function submitExam() {
   await api('exam', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bank: E.bank, answers }) });
   try { localStorage.setItem('lastExamReview', JSON.stringify({ bank: E.bank, at: Date.now(), items: E.qs.map((q, i) => ({ qid: q.id, picks: [...E.picks[i]], correct: answers[i].correct })) })); } catch (e) {}
   try { localStorage.setItem('lastExamQids_' + E.bank, JSON.stringify(E.qs.map(q => q.id))); } catch (e) {}
+  try {
+    const wk = 'examWrongQids_' + E.bank;
+    const wset = new Set(JSON.parse(localStorage.getItem(wk) || '[]'));
+    answers.forEach(a => { if (!a.correct) wset.add(a.qid); });
+    localStorage.setItem(wk, JSON.stringify([...wset]));
+  } catch (e) {}
   renderExamResult(E.bank, E.qs, E.picks.map(p => [...p]), answers.map(a => a.correct), '本场题库组：' + E.bank);
   E = null;
   show('view-result');
